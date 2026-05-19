@@ -19,7 +19,7 @@ function apiRequest(method, path, body = null) {
       method,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`
+        'x-api-key': API_KEY
       }
     };
     
