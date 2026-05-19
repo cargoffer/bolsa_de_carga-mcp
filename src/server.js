@@ -4,26 +4,39 @@
  */
 
 import http from 'http';
+import https from 'https';
 
 const API_URL = process.env.API_URL || 'http://localhost:8080';
 let API_KEY = process.env.API_KEY || '';
+let JWT_TOKEN = '';
 
-// HTTP request helper
-function apiRequest(method, path, body = null) {
+// Use correct HTTP module based on URL
+const isHttps = API_URL.startsWith('https://');
+const httpModule = isHttps ? https : http;
+
+// Store token after login
+function setAuth(token) { JWT_TOKEN = token; }
+
+// Make API request
+const apiRequest = (method, path, body = null, authToken = null) => {
   return new Promise((resolve, reject) => {
     const url = new URL(path, API_URL);
+    const headers = { 'Content-Type': 'application/json' };
+    
+    // Use passed token, then stored JWT, then static API key
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    else if (JWT_TOKEN) headers['Authorization'] = `Bearer ${JWT_TOKEN}`;
+    else if (API_KEY) headers['x-api-key'] = API_KEY;
+    
     const options = {
       hostname: url.hostname,
       port: url.port || 443,
       path: url.pathname + (url.search || ''),
       method,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': API_KEY
-      }
+      headers
     };
-    
-    const req = http.request(options, (res) => {
+
+    const req = httpModule.request(options, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
@@ -186,10 +199,15 @@ async function handleRequest(req) {
       
       // === AUTH ===
       case 'bolsa_auth_login':
-        result = await apiRequest('POST', '/company/auth/login', params);
+        // Use /auth/login for ecmr/cargo backends
+        result = await apiRequest('POST', '/auth/login', params);
+        // Auto-store token for subsequent calls
+        if (result?.data) {
+          setAuth(result.data);
+        }
         break;
       case 'bolsa_auth_register':
-        result = await apiRequest('POST', '/company/auth/register', params);
+        result = await apiRequest('POST', '/auth/register', params);
         break;
       
       default:
