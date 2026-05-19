@@ -1,0 +1,256 @@
+/**
+ * Cargoffer Bolsa de Carga MCP Server
+ * Standalone implementation for Model Context Protocol
+ */
+
+import http from 'http';
+
+const API_URL = process.env.API_URL || 'https://api.cargoffer.com';
+let API_KEY = process.env.API_KEY || '';
+
+// HTTP request helper
+function apiRequest(method, path, body = null) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(path, API_URL);
+    const options = {
+      hostname: url.hostname,
+      port: url.port || 443,
+      path: url.pathname + (url.search || ''),
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_KEY}`
+      }
+    };
+    
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch {
+          resolve({ raw: data });
+        }
+      });
+    });
+    
+    req.on('error', reject);
+    if (body) req.write(JSON.stringify(body));
+    req.end();
+  });
+}
+
+// MCP Protocol: JSON-RPC 2.0
+async function handleRequest(req) {
+  const { jsonrpc, id, method, params } = req;
+  
+  try {
+    let result;
+    
+    switch(method) {
+      // === AUCTIONS ===
+      case 'bolsa_auctions_active': 
+        result = await apiRequest('GET', `/auction/active?limit=${params.limit||50}`); 
+        break;
+      case 'bolsa_auction_get': 
+        result = await apiRequest('GET', `/auction/${params.serviceCode}`); 
+        break;
+      case 'bolsa_auction_create':
+        result = await apiRequest('POST', '/auction/', {
+          from: { city: params.fromCity, postal_code: params.fromPostal, country: params.fromCountry || 'ES' },
+          to: { city: params.toCity, postal_code: params.toPostal, country: params.toCountry || 'ES' },
+          goods: { description: params.goodsDescription, weight: params.weight, packages: params.packages },
+          vehicle_type: params.vehicleType,
+          pickup_date: params.pickupDate
+        });
+        break;
+      case 'bolsa_auction_update':
+        result = await apiRequest('PUT', `/auction/${params.serviceCode}`, params);
+        break;
+      case 'bolsa_auction_delete':
+        result = await apiRequest('DELETE', `/auction/${params.serviceCode}`);
+        break;
+      case 'bolsa_auction_publish':
+        result = await apiRequest('PUT', `/auction/publish/${params.serviceCode}`);
+        break;
+      case 'bolsa_auction_accept':
+        result = await apiRequest('PUT', `/auction/acceptCurrent/${params.serviceCode}`);
+        break;
+      case 'bolsa_auction_sign':
+        result = await apiRequest('PUT', `/auction/sign/${params.serviceCode}`, params);
+        break;
+      case 'bolsa_auction_favorites':
+        result = await apiRequest('GET', '/auction/favorites');
+        break;
+      case 'bolsa_auction_favorite_add':
+        result = await apiRequest('POST', '/auction/favorites/', params);
+        break;
+      case 'bolsa_auction_favorite_remove':
+        result = await apiRequest('DELETE', `/auction/favorites/${params.id}`);
+        break;
+      
+      // === ADDRESSES ===
+      case 'bolsa_addresses_list':
+        result = await apiRequest('GET', `/api/address/?limit=${params.limit||50}`);
+        break;
+      case 'bolsa_address_create':
+        result = await apiRequest('POST', '/api/address/', params);
+        break;
+      case 'bolsa_address_update':
+        result = await apiRequest('PUT', `/api/address/${params.id}`, params);
+        break;
+      case 'bolsa_address_delete':
+        result = await apiRequest('DELETE', `/api/address/${params.id}`);
+        break;
+      
+      // === TRUCKERS ===
+      case 'bolsa_truckers_list':
+        result = await apiRequest('GET', `/api/truckers/?limit=${params.limit||50}`);
+        break;
+      case 'bolsa_trucker_create':
+        result = await apiRequest('POST', '/api/truckers/', params);
+        break;
+      case 'bolsa_trucker_update':
+        result = await apiRequest('PUT', `/api/truckers/${params.id}`, params);
+        break;
+      case 'bolsa_trucker_delete':
+        result = await apiRequest('DELETE', `/api/truckers/${params.id}`);
+        break;
+      
+      // === VEHICLES ===
+      case 'bolsa_vehicles_list':
+        result = await apiRequest('GET', `/api/vehicle/?limit=${params.limit||50}`);
+        break;
+      case 'bolsa_vehicle_create':
+        result = await apiRequest('POST', '/api/vehicle/', params);
+        break;
+      case 'bolsa_vehicle_update':
+        result = await apiRequest('PUT', `/api/vehicle/${params.id}`, params);
+        break;
+      case 'bolsa_vehicle_delete':
+        result = await apiRequest('DELETE', `/api/vehicle/${params.id}`);
+        break;
+      
+      // === DELIVERY ===
+      case 'bolsa_delivery_active':
+        result = await apiRequest('GET', '/delivery/active');
+        break;
+      case 'bolsa_delivery_get':
+        result = await apiRequest('GET', `/delivery/${params.serviceCode}`);
+        break;
+      case 'bolsa_delivery_download':
+        result = await apiRequest('GET', `/delivery/download/${params.serviceCode}`);
+        break;
+      
+      // === AUTH ===
+      case 'bolsa_auth_login':
+        result = await apiRequest('POST', '/auth/login', params);
+        break;
+      case 'bolsa_auth_register':
+        result = await apiRequest('POST', '/auth/register', params);
+        break;
+      
+      default:
+        throw new Error(`Unknown method: ${method}`);
+    }
+    
+    return { jsonrpc: '2.0', id, result };
+  } catch (error) {
+    return { jsonrpc: '2.0', id, error: { code: -32601, message: error.message } };
+  }
+}
+
+// Tool definitions
+const toolDefinitions = [
+  // === AUCTIONS ===
+  { name: "bolsa_auctions_active", description: "List active freight auctions", inputSchema: { type: "object", properties: { limit: { type: "number" } } } },
+  { name: "bolsa_auction_get", description: "Get auction details", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
+  { name: "bolsa_auction_create", description: "Create new freight auction", inputSchema: { type: "object", properties: { fromCity: { type: "string" }, fromPostal: { type: "string" }, fromCountry: { type: "string" }, toCity: { type: "string" }, toPostal: { type: "string" }, toCountry: { type: "string" }, goodsDescription: { type: "string" }, weight: { type: "number" }, packages: { type: "number" }, vehicleType: { type: "string" }, pickupDate: { type: "string" } }, required: ["fromCity", "toCity", "goodsDescription", "vehicleType"] } },
+  { name: "bolsa_auction_update", description: "Update auction", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
+  { name: "bolsa_auction_delete", description: "Delete auction", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
+  { name: "bolsa_auction_publish", description: "Publish auction to marketplace", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
+  { name: "bolsa_auction_accept", description: "Accept current bid and close auction", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
+  { name: "bolsa_auction_sign", description: "Sign auction with CMR data", inputSchema: { type: "object", properties: { serviceCode: { type: "string" }, signature: { type: "string" } }, required: ["serviceCode", "signature"] } },
+  { name: "bolsa_auction_favorites", description: "List favorite auctions", inputSchema: { type: "object" } },
+  { name: "bolsa_auction_favorite_add", description: "Add auction to favorites", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
+  { name: "bolsa_auction_favorite_remove", description: "Remove from favorites", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
+  
+  // === ADDRESSES ===
+  { name: "bolsa_addresses_list", description: "List addresses", inputSchema: { type: "object", properties: { limit: { type: "number" } } } },
+  { name: "bolsa_address_create", description: "Create address", inputSchema: { type: "object", properties: { name: { type: "string" }, street: { type: "string" }, city: { type: "string" }, state: { type: "string" }, postalCode: { type: "string" }, country: { type: "string" } }, required: ["name", "street", "city"] } },
+  { name: "bolsa_address_update", description: "Update address", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
+  { name: "bolsa_address_delete", description: "Delete address", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
+  
+  // === TRUCKERS ===
+  { name: "bolsa_truckers_list", description: "List truckers", inputSchema: { type: "object", properties: { limit: { type: "number" } } } },
+  { name: "bolsa_trucker_create", description: "Create trucker", inputSchema: { type: "object", properties: { name: { type: "string" }, email: { type: "string" }, phone: { type: "string" }, license: { type: "string" } }, required: ["name", "phone"] } },
+  { name: "bolsa_trucker_update", description: "Update trucker", inputSchema: { type: "object", properties: { id: { type: "string" }, name: { type: "string" }, phone: { type: "string" } }, required: ["id"] } },
+  { name: "bolsa_trucker_delete", description: "Delete trucker", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
+  
+  // === VEHICLES ===
+  { name: "bolsa_vehicles_list", description: "List vehicles", inputSchema: { type: "object", properties: { limit: { type: "number" } } } },
+  { name: "bolsa_vehicle_create", description: "Create vehicle", inputSchema: { type: "object", properties: { plate: { type: "string" }, type: { type: "string" }, brand: { type: "string" }, model: { type: "string" }, capacity: { type: "number" } }, required: ["plate"] } },
+  { name: "bolsa_vehicle_update", description: "Update vehicle", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
+  { name: "bolsa_vehicle_delete", description: "Delete vehicle", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
+  
+  // === DELIVERY ===
+  { name: "bolsa_delivery_active", description: "List active deliveries", inputSchema: { type: "object" } },
+  { name: "bolsa_delivery_get", description: "Get delivery details", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
+  { name: "bolsa_delivery_download", description: "Download delivery CMR", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
+  
+  // === AUTH ===
+  { name: "bolsa_auth_login", description: "Login to API", inputSchema: { type: "object", properties: { email: { type: "string" }, password: { type: "string" } }, required: ["email", "password"] } },
+  { name: "bolsa_auth_register", description: "Register new user", inputSchema: { type: "object", properties: { email: { type: "string" }, password: { type: "string" }, companyName: { type: "string" } }, required: ["email", "password", "companyName"] } },
+];
+
+// Server startup
+const PORT = process.env.PORT || 3000;
+
+const server = http.createServer(async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  
+  if (req.url === '/health') {
+    res.end(JSON.stringify({ status: 'ok' }));
+    return;
+  }
+  
+  if (req.url === '/tools') {
+    res.end(JSON.stringify({ tools: toolDefinitions }));
+    return;
+  }
+  
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
+  
+  if (req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const request = JSON.parse(body);
+        const response = await handleRequest(request);
+        res.end(JSON.stringify(response));
+      } catch {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: { code: -32600, message: 'Invalid Request' } }));
+      }
+    });
+  } else {
+    res.statusCode = 404;
+    res.end(JSON.stringify({ error: { code: -32600, message: 'Not Found' } }));
+  }
+});
+
+server.listen(PORT, () => {
+  console.log(`Bolsa de Carga MCP Server running on port ${PORT}`);
+  console.log(`API: ${API_URL}`);
+});
+
+export default { handleRequest };
