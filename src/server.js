@@ -5,7 +5,7 @@
 
 import http from 'http';
 
-const API_URL = process.env.API_URL || 'https://api.cargoffer.com';
+const API_URL = process.env.API_URL || 'http://localhost:8080';
 let API_KEY = process.env.API_KEY || '';
 
 // HTTP request helper
@@ -51,13 +51,13 @@ async function handleRequest(req) {
     switch(method) {
       // === AUCTIONS ===
       case 'bolsa_auctions_active': 
-        result = await apiRequest('GET', `/auction/active?limit=${params.limit||50}`); 
+        result = await apiRequest('GET', `/api/auction/active?limit=${params.limit||50}`); 
         break;
       case 'bolsa_auction_get': 
-        result = await apiRequest('GET', `/auction/${params.serviceCode}`); 
+        result = await apiRequest('GET', `/api/auction/${params.serviceCode}`); 
         break;
       case 'bolsa_auction_create':
-        result = await apiRequest('POST', '/auction/', {
+        result = await apiRequest('POST', '/api/auction/', {
           from: { city: params.fromCity, postal_code: params.fromPostal, country: params.fromCountry || 'ES' },
           to: { city: params.toCity, postal_code: params.toPostal, country: params.toCountry || 'ES' },
           goods: { description: params.goodsDescription, weight: params.weight, packages: params.packages },
@@ -66,46 +66,46 @@ async function handleRequest(req) {
         });
         break;
       case 'bolsa_auction_update':
-        result = await apiRequest('PUT', `/auction/${params.serviceCode}`, params);
+        result = await apiRequest('PUT', `/api/auction/${params.serviceCode}`, params);
         break;
       case 'bolsa_auction_delete':
-        result = await apiRequest('DELETE', `/auction/${params.serviceCode}`);
+        result = await apiRequest('DELETE', `/api/auction/${params.serviceCode}`);
         break;
       case 'bolsa_auction_publish':
-        result = await apiRequest('PUT', `/auction/publish/${params.serviceCode}`);
+        result = await apiRequest('PUT', `/api/auction/publish/${params.serviceCode}`);
         break;
       case 'bolsa_auction_accept':
-        result = await apiRequest('POST', `/auction/acceptCurrent/${params.serviceCode}`);
+        result = await apiRequest('POST', `/api/auction/acceptCurrent/${params.serviceCode}`);
         break;
       case 'bolsa_auction_private':
-        result = await apiRequest('POST', '/auction/private', params);
+        result = await apiRequest('POST', '/api/auction/private', params);
         break;
       case 'bolsa_auction_signed_list':
-        result = await apiRequest('GET', `/auction/sign?limit=${params.limit||50}&signedBy=${params.signedBy||'company'}`);
+        result = await apiRequest('GET', `/api/auction/sign?limit=${params.limit||50}&signedBy=${params.signedBy||'company'}`);
         break;
       case 'bolsa_auction_contract':
-        result = await apiRequest('POST', '/auction/contract/', params);
+        result = await apiRequest('POST', '/api/auction/contract/', params);
         break;
       case 'bolsa_auction_contract_get':
-        result = await apiRequest('GET', `/auction/contract/${params.serviceCode}`);
+        result = await apiRequest('GET', `/api/auction/contract/${params.serviceCode}`);
         break;
       case 'bolsa_auction_contract_update':
-        result = await apiRequest('PUT', `/auction/contract/${params.serviceCode}`, params);
+        result = await apiRequest('PUT', `/api/auction/contract/${params.serviceCode}`, params);
         break;
       case 'bolsa_auction_contract_delete':
-        result = await apiRequest('DELETE', `/auction/contract/${params.serviceCode}`);
+        result = await apiRequest('DELETE', `/api/auction/contract/${params.serviceCode}`);
         break;
       case 'bolsa_auction_sign':
-        result = await apiRequest('PUT', `/auction/sign/${params.serviceCode}`, params);
+        result = await apiRequest('PUT', `/api/auction/sign/${params.serviceCode}`, params);
         break;
       case 'bolsa_auction_favorites':
-        result = await apiRequest('GET', '/auction/favorites');
+        result = await apiRequest('GET', '/api/auction/favorites');
         break;
       case 'bolsa_auction_favorite_add':
-        result = await apiRequest('POST', '/auction/favorites/', params);
+        result = await apiRequest('POST', '/api/auction/favorites/', params);
         break;
       case 'bolsa_auction_favorite_remove':
-        result = await apiRequest('DELETE', `/auction/favorites/${params.id}`);
+        result = await apiRequest('DELETE', `/api/auction/favorites/${params.id}`);
         break;
       
       // === ADDRESSES ===
@@ -186,10 +186,10 @@ async function handleRequest(req) {
       
       // === AUTH ===
       case 'bolsa_auth_login':
-        result = await apiRequest('POST', '/auth/login', params);
+        result = await apiRequest('POST', '/company/auth/login', params);
         break;
       case 'bolsa_auth_register':
-        result = await apiRequest('POST', '/auth/register', params);
+        result = await apiRequest('POST', '/company/auth/register', params);
         break;
       
       default:
