@@ -75,7 +75,25 @@ async function handleRequest(req) {
         result = await apiRequest('PUT', `/auction/publish/${params.serviceCode}`);
         break;
       case 'bolsa_auction_accept':
-        result = await apiRequest('PUT', `/auction/acceptCurrent/${params.serviceCode}`);
+        result = await apiRequest('POST', `/auction/acceptCurrent/${params.serviceCode}`);
+        break;
+      case 'bolsa_auction_private':
+        result = await apiRequest('POST', '/auction/private', params);
+        break;
+      case 'bolsa_auction_signed_list':
+        result = await apiRequest('GET', `/auction/sign?limit=${params.limit||50}&signedBy=${params.signedBy||'company'}`);
+        break;
+      case 'bolsa_auction_contract':
+        result = await apiRequest('POST', '/auction/contract/', params);
+        break;
+      case 'bolsa_auction_contract_get':
+        result = await apiRequest('GET', `/auction/contract/${params.serviceCode}`);
+        break;
+      case 'bolsa_auction_contract_update':
+        result = await apiRequest('PUT', `/auction/contract/${params.serviceCode}`, params);
+        break;
+      case 'bolsa_auction_contract_delete':
+        result = await apiRequest('DELETE', `/auction/contract/${params.serviceCode}`);
         break;
       case 'bolsa_auction_sign':
         result = await apiRequest('PUT', `/auction/sign/${params.serviceCode}`, params);
@@ -133,6 +151,9 @@ async function handleRequest(req) {
         break;
       
       // === DELIVERY ===
+      case 'bolsa_delivery_list':
+        result = await apiRequest('GET', `/delivery/?limit=${params.limit||50}`);
+        break;
       case 'bolsa_delivery_active':
         result = await apiRequest('GET', '/delivery/active');
         break;
@@ -141,6 +162,26 @@ async function handleRequest(req) {
         break;
       case 'bolsa_delivery_download':
         result = await apiRequest('GET', `/delivery/download/${params.serviceCode}`);
+        break;
+      case 'bolsa_delivery_msg':
+        result = await apiRequest('POST', `/delivery/msg/${params.serviceCode}`, params);
+        break;
+      case 'bolsa_delivery_msg_list':
+        result = await apiRequest('GET', `/delivery/msg/${params.serviceCode}`);
+        break;
+      
+      // === OIL (Fuel) ===
+      case 'bolsa_oil_list':
+        result = await apiRequest('GET', `/oil/?limit=${params.limit||50}`);
+        break;
+      case 'bolsa_oil_create':
+        result = await apiRequest('POST', '/oil/', params);
+        break;
+      case 'bolsa_oil_update':
+        result = await apiRequest('PUT', `/oil/${params.id}`, params);
+        break;
+      case 'bolsa_oil_delete':
+        result = await apiRequest('DELETE', `/oil/${params.id}`);
         break;
       
       // === AUTH ===
@@ -171,6 +212,12 @@ const toolDefinitions = [
   { name: "bolsa_auction_delete", description: "Delete auction", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
   { name: "bolsa_auction_publish", description: "Publish auction to marketplace", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
   { name: "bolsa_auction_accept", description: "Accept current bid and close auction", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
+  { name: "bolsa_auction_private", description: "Create private auction", inputSchema: { type: "object", properties: { fromCity: { type: "string" }, toCity: { type: "string" }, goodsDescription: { type: "string" }, truckerId: { type: "string" } }, required: ["fromCity", "toCity", "truckerId"] } },
+  { name: "bolsa_auction_signed_list", description: "List signed auctions", inputSchema: { type: "object", properties: { limit: { type: "number" }, signedBy: { type: "string" } } } },
+  { name: "bolsa_auction_contract", description: "Create contract for auction", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
+  { name: "bolsa_auction_contract_get", description: "Get contract details", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
+  { name: "bolsa_auction_contract_update", description: "Update contract", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
+  { name: "bolsa_auction_contract_delete", description: "Delete contract", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
   { name: "bolsa_auction_sign", description: "Sign auction with CMR data", inputSchema: { type: "object", properties: { serviceCode: { type: "string" }, signature: { type: "string" } }, required: ["serviceCode", "signature"] } },
   { name: "bolsa_auction_favorites", description: "List favorite auctions", inputSchema: { type: "object" } },
   { name: "bolsa_auction_favorite_add", description: "Add auction to favorites", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
@@ -195,9 +242,18 @@ const toolDefinitions = [
   { name: "bolsa_vehicle_delete", description: "Delete vehicle", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
   
   // === DELIVERY ===
+  { name: "bolsa_delivery_list", description: "List all deliveries", inputSchema: { type: "object", properties: { limit: { type: "number" } } } },
   { name: "bolsa_delivery_active", description: "List active deliveries", inputSchema: { type: "object" } },
   { name: "bolsa_delivery_get", description: "Get delivery details", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
   { name: "bolsa_delivery_download", description: "Download delivery CMR", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
+  { name: "bolsa_delivery_msg", description: "Send delivery message", inputSchema: { type: "object", properties: { serviceCode: { type: "string" }, message: { type: "string" } }, required: ["serviceCode", "message"] } },
+  { name: "bolsa_delivery_msg_list", description: "List delivery messages", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
+  
+  // === OIL (Fuel) ===
+  { name: "bolsa_oil_list", description: "List fuel expenses", inputSchema: { type: "object", properties: { limit: { type: "number" } } } },
+  { name: "bolsa_oil_create", description: "Create fuel expense", inputSchema: { type: "object", properties: { auctionId: { type: "string" }, amount: { type: "number" }, station: { type: "string" } }, required: ["auctionId", "amount"] } },
+  { name: "bolsa_oil_update", description: "Update fuel expense", inputSchema: { type: "object", properties: { id: { type: "string" }, amount: { type: "number" } }, required: ["id"] } },
+  { name: "bolsa_oil_delete", description: "Delete fuel expense", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
   
   // === AUTH ===
   { name: "bolsa_auth_login", description: "Login to API", inputSchema: { type: "object", properties: { email: { type: "string" }, password: { type: "string" } }, required: ["email", "password"] } },
