@@ -16,7 +16,7 @@ Cargoffer Bolsa de Carga is a freight marketplace API enabling AI agents to sear
 git clone https://github.com/cargoffer/bolsa_de_carga-mcp.git
 cd bolsa_de_carga-mcp
 export API_KEY="your-api-key"
-export API_URL="https://api.cargoffer.com"
+export API_URL="https://api.pro.cargoffer.com"
 
 # Run MCP server
 node src/server.js

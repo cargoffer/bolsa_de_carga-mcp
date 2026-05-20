@@ -17,9 +17,22 @@
     "logistics",
     "transportation",
     "truck brokerage",
-    "ai agents"
+    "ai agents",
+    "llm tools",
+    "freight auction",
+    "load board"
   ],
   "author": "Cargoffer",
   "license": "MIT",
-  "dependencies": {}
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cargoffer/bolsa_de_carga-mcp"
+  },
+  "homepage": "https://github.com/cargoffer/bolsa_de_carga-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/cargoffer/bolsa_de_carga-mcp/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
