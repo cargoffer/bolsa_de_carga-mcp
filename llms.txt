@@ -1,0 +1,140 @@
+# Llms.txt - Cargoffer Bolsa de Carga API
+
+## Overview
+Cargoffer Bolsa de Carga is a freight marketplace API enabling AI agents to search, create, and manage freight auctions (loads) between shippers and truckers.
+
+## Capabilities
+- List active freight auctions (loads seeking trucks)
+- Create/update/delete auctions
+- Accept bids and close deals
+- Manage addresses, truckers, vehicles
+- Track deliveries and generate CMR waybills
+
+## Quick Start
+```bash
+# Clone and configure
+git clone https://github.com/cargoffer/bolsa_de_carga-mcp.git
+cd bolsa_de_carga-mcp
+export API_KEY="your-api-key"
+export API_URL="https://api.cargoffer.com"
+
+# Run MCP server
+node src/server.js
+
+# Call via JSON-RPC
+curl -X POST http://localhost:3000 \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"bolsa_auctions_active","params":{"limit":10}}'
+```
+
+## Available Tools (35+)
+
+### Auctions
+| Tool | Description | Required Params |
+|------|-------------|-----------------|
+| bolsa_auctions_active | List active freight auctions | limit (optional) |
+| bolsa_auction_get | Get auction details by serviceCode | serviceCode |
+| bolsa_auction_create | Create new freight auction | fromCity, toCity, goodsDescription, vehicleType |
+| bolsa_auction_update | Update auction | serviceCode |
+| bolsa_auction_delete | Delete auction | serviceCode |
+| bolsa_auction_publish | Publish auction to marketplace | serviceCode |
+| bolsa_auction_accept | Accept current bid and close | serviceCode |
+| bolsa_auction_private | Create private auction | fromCity, toCity, truckerId |
+| bolsa_auction_contract | Create CMR contract | serviceCode |
+| bolsa_auction_sign | Sign with CMR data | serviceCode, signature |
+| bolsa_auction_favorites | List favorites | - |
+| bolsa_auction_favorite_add | Add to favorites | serviceCode |
+
+### Addresses
+| Tool | Description | Required Params |
+|------|-------------|-----------------|
+| bolsa_addresses_list | List saved addresses | limit (optional) |
+| bolsa_address_create | Create address | name, street, city |
+| bolsa_address_update | Update address | id |
+| bolsa_address_delete | Delete address | id |
+
+### Truckers
+| Tool | Description | Required Params |
+|------|-------------|-----------------|
+| bolsa_truckers_list | List truckers | limit (optional) |
+| bolsa_trucker_create | Register trucker | name, phone |
+| bolsa_trucker_update | Update trucker | id |
+| bolsa_trucker_delete | Remove trucker | id |
+
+### Vehicles
+| Tool | Description | Required Params |
+|------|-------------|-----------------|
+| bolsa_vehicles_list | List vehicles | limit (optional) |
+| bolsa_vehicle_create | Register vehicle | plate |
+| bola_vehicle_update | Update vehicle | id |
+| bola_vehicle_delete | Remove vehicle | id |
+
+### Deliveries
+| Tool | Description | Required Params |
+|------|-------------|-----------------|
+| bolsa_delivery_list | List deliveries | limit (optional) |
+| bolsa_delivery_active | List active deliveries | - |
+| bolsa_delivery_get | Get delivery details | serviceCode |
+| bolsa_delivery_download | Download CMR PDF | serviceCode |
+| bolsa_delivery_msg | Send message | serviceCode, message |
+
+### Auth
+| Tool | Description | Required Params |
+|------|-------------|-----------------|
+| bolsa_auth_login | Login and get token | email, password |
+| bolsa_auth_register | Register new user | email, password, companyName |
+
+## Example: Find Madrid-Barcelona loads
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "bolsa_auctions_active",
+  "params": {
+    "limit": 20
+  }
+}
+```
+
+Response:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": [
+    {
+      "serviceCode": "MADBCNnT4FN",
+      "from": { "city": "Madrid", "country": "ES" },
+      "to": { "city": "Barcelona", "country": "ES" },
+      "goods": { "description": "Electronics", "weight": 500 },
+      "vehicle_type": "camion",
+      "status": "active"
+    }
+  ]
+}
+```
+
+## Integration
+Add to Claude Desktop config:
+```json
+{
+  "mcpServers": {
+    "bolsa-de-carga": {
+      "command": "node",
+      "args": ["/path/to/bolsa_de_carga-mcp/src/server.js"],
+      "env": {
+        "API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+## Use Cases
+- AI dispatchers finding loads for truck fleets
+- Freight marketplaces integrating real-time auctions
+- Logistics platforms programmatic access
+- Automated bidding systems
+
+## Keywords
+bolsa de carga, freight marketplace, freight, shipping, logistics, transportation, truck brokerage, load board, freight matching, auction, bid, CMR, eCMR, delivery, cargo, trucking, hauler
