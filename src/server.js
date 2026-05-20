@@ -6,8 +6,8 @@
 import http from 'http';
 import https from 'https';
 
-const API_URL = process.env.API_URL || 'http://localhost:8080';
-let API_KEY = process.env.API_KEY || '';
+const API_URL = process.env.API_URL || 'http://localhost:8090';
+const API_KEY = process.env.API_KEY || '';
 let JWT_TOKEN = '';
 
 // Use correct HTTP module based on URL
@@ -15,7 +15,9 @@ const isHttps = API_URL.startsWith('https://');
 const httpModule = isHttps ? https : http;
 
 // Store token after login
-function setAuth(token) { JWT_TOKEN = token; }
+function setAuth(token) { 
+  JWT_TOKEN = token; 
+}
 
 // Make API request
 const apiRequest = (method, path, body = null, authToken = null) => {
@@ -23,10 +25,15 @@ const apiRequest = (method, path, body = null, authToken = null) => {
     const url = new URL(path, API_URL);
     const headers = { 'Content-Type': 'application/json' };
     
-    // Use passed token, then stored JWT, then static API key
-    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-    else if (JWT_TOKEN) headers['Authorization'] = `Bearer ${JWT_TOKEN}`;
-    else if (API_KEY) headers['x-api-key'] = API_KEY;
+    // Use API key for /api/* routes, otherwise use passed token or stored JWT
+    const isApiRoute = path.startsWith('/api/');
+    if (isApiRoute && API_KEY) {
+      headers['x-api-key'] = API_KEY;
+    } else if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    } else if (JWT_TOKEN) {
+      headers['Authorization'] = `Bearer ${JWT_TOKEN}`;
+    }
     
     const options = {
       hostname: url.hostname,
@@ -75,7 +82,8 @@ async function handleRequest(req) {
           to: { city: params.toCity, postal_code: params.toPostal, country: params.toCountry || 'ES' },
           goods: { description: params.goodsDescription, weight: params.weight, packages: params.packages },
           vehicle_type: params.vehicleType,
-          pickup_date: params.pickupDate
+          date_start: params.pickupDate || params.date_start,
+          date_end: params.deliveryDate || params.date_end
         });
         break;
       case 'bolsa_auction_update':
@@ -123,67 +131,71 @@ async function handleRequest(req) {
       
       // === ADDRESSES ===
       case 'bolsa_addresses_list':
-        result = await apiRequest('GET', `/api/address/?limit=${params.limit||50}`);
+        result = await apiRequest('GET', `/truckers/address?limit=${params.limit||50}`);
         break;
       case 'bolsa_address_create':
-        result = await apiRequest('POST', '/api/address/', params);
+        // Add company_name required by backend
+        result = await apiRequest('POST', '/truckers/address', {
+          ...params,
+          company_name: params.companyName || params.company_name || 'Testing CIA'
+        });
         break;
       case 'bolsa_address_update':
-        result = await apiRequest('PUT', `/api/address/${params.id}`, params);
+        result = await apiRequest('PUT', `/truckers/address/${params.id}`, params);
         break;
       case 'bolsa_address_delete':
-        result = await apiRequest('DELETE', `/api/address/${params.id}`);
+        result = await apiRequest('DELETE', `/truckers/address/${params.id}`);
         break;
       
-      // === TRUCKERS ===
-      case 'bolsa_truckers_list':
-        result = await apiRequest('GET', `/api/truckers/?limit=${params.limit||50}`);
+// === TRUCKERS (Trailers) ===
+      case 'bolsa_truckers_list': 
+        result = await apiRequest('GET', `/truckers/trailers?limit=${params.limit||50}`);
         break;
       case 'bolsa_trucker_create':
-        result = await apiRequest('POST', '/api/truckers/', params);
+        result = await apiRequest('POST', '/truckers/trailers', params);
         break;
       case 'bolsa_trucker_update':
-        result = await apiRequest('PUT', `/api/truckers/${params.id}`, params);
+        result = await apiRequest('PUT', `/truckers/trailers/${params.id}`, params);
         break;
       case 'bolsa_trucker_delete':
-        result = await apiRequest('DELETE', `/api/truckers/${params.id}`);
+        result = await apiRequest('DELETE', `/truckers/trailers/${params.id}`);
         break;
-      
+     
       // === VEHICLES ===
       case 'bolsa_vehicles_list':
-        result = await apiRequest('GET', `/api/vehicle/?limit=${params.limit||50}`);
+        result = await apiRequest('GET', `/truckers/vehicles?limit=${params.limit||50}`);
         break;
       case 'bolsa_vehicle_create':
-        result = await apiRequest('POST', '/api/vehicle/', params);
+        result = await apiRequest('POST', '/truckers/vehicles', params);
         break;
       case 'bolsa_vehicle_update':
-        result = await apiRequest('PUT', `/api/vehicle/${params.id}`, params);
+        result = await apiRequest('PUT', `/truckers/vehicles/${params.id}`, params);
         break;
       case 'bolsa_vehicle_delete':
-        result = await apiRequest('DELETE', `/api/vehicle/${params.id}`);
+        result = await apiRequest('DELETE', `/truckers/vehicles/${params.id}`);
         break;
       
-      // === DELIVERY ===
+// === DELIVERY ===
       case 'bolsa_delivery_list':
-        result = await apiRequest('GET', `/delivery/?limit=${params.limit||50}`);
+        result = await apiRequest('GET', `/truckers/deliveries?limit=${params.limit||50}`);
         break;
       case 'bolsa_delivery_active':
-        result = await apiRequest('GET', '/delivery/active');
+        result = await apiRequest('GET', '/truckers/deliveries/active');
         break;
       case 'bolsa_delivery_get':
-        result = await apiRequest('GET', `/delivery/${params.serviceCode}`);
+        result = await apiRequest('GET', `/truckers/deliveries/${params.serviceCode}`);
         break;
       case 'bolsa_delivery_download':
-        result = await apiRequest('GET', `/delivery/download/${params.serviceCode}`);
+        result = await apiRequest('GET', `/truckers/deliveries/${params.serviceCode}/pdf`);
         break;
       case 'bolsa_delivery_msg':
-        result = await apiRequest('POST', `/delivery/msg/${params.serviceCode}`, params);
+        result = await apiRequest('POST', `/truckers/deliveries/${params.serviceCode}/msg`, params);
         break;
       case 'bolsa_delivery_msg_list':
-        result = await apiRequest('GET', `/delivery/msg/${params.serviceCode}`);
+        result = await apiRequest('GET', `/truckers/deliveries/${params.serviceCode}/msg`);
         break;
-      
-      // === OIL (Fuel) ===
+     
+      // === OIL (Fuel) - NOT IMPLEMENTED ===
       case 'bolsa_oil_list':
         result = await apiRequest('GET', `/oil/?limit=${params.limit||50}`);
         break;
@@ -199,15 +211,13 @@ async function handleRequest(req) {
       
       // === AUTH ===
       case 'bolsa_auth_login':
-        // Use /auth/login for ecmr/cargo backends
-        result = await apiRequest('POST', '/auth/login', params);
-        // Auto-store token for subsequent calls
+        result = await apiRequest('POST', '/truckers/auth/login', params);
         if (result?.data) {
           setAuth(result.data);
         }
         break;
       case 'bolsa_auth_register':
-        result = await apiRequest('POST', '/auth/register', params);
+        result = await apiRequest('POST', '/truckers/auth/register', params);
         break;
       
       default:
