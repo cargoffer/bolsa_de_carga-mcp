@@ -23,6 +23,16 @@ The European freight spot market runs through dozens of incompatible load boards
 
 This MCP server exposes the Cargoffer Bolsa de Carga API — a unified **European road transport** freight marketplace — as first-class LLM tools. It lets AI agents search available loads, create and publish auctions, manage bids, register company vehicles and drivers, track delivery status, and generate CMR waybills. It transforms an AI assistant from a chat interface into an operational freight desk capable of **logistics document automation** and marketplace transactions.
 
+## AI Agent Capabilities
+
+| Capability | What the AI can do |
+|---|---|
+| **Load monitoring** | Find and filter active freight auctions in real-time |
+| **Bid management** | Submit bids on available loads automatically |
+| **Address ops** | Manage shipping addresses and locations |
+| **Fleet matching** | Match available vehicles and truckers to loads |
+| **Delivery tracking** | Track delivery status across all shipments |
+
 ---
 
 ## MCP Capabilities
