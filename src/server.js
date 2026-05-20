@@ -6,7 +6,7 @@
 import http from 'http';
 import https from 'https';
 
-const API_URL = process.env.API_URL || 'http://localhost:8090';
+const API_URL = process.env.API_URL || 'https://api.cargoffer.com';
 const API_KEY = process.env.API_KEY || '';
 let JWT_TOKEN = '';
 
