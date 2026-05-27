@@ -70,11 +70,11 @@ async function handleRequest(req) {
     
     const result = await apiRequest('GET', apiPath, params);
     
-    // Enhance auth error messages with guidance
-    // Check result.message exists AND contains NO_TOKEN
+    // Enhance auth error messages with guidance (keep original message intact, add new field)
     const msg = result.message || '';
     if (result.status === 401 || result.status === 403 || msg.includes('NO_TOKEN')) {
-      result.message = msg + ' - Para obtener tu API key: llama bolsa_apikey_get o crea una con bolsa_apikey_create';
+      // Add guidance field without modifying original message
+      result.guidance = 'Para obtener tu API key: llama bolsa_apikey_get o crea una con bolsa_apikey_create';
     }
     
     return { jsonrpc: '2.0', id, result };
