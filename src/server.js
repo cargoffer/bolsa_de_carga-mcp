@@ -69,6 +69,10 @@ async function handleRequest(req) {
     let result;
     
     switch(method) {
+      // === COUNTRIES ===
+      case 'bolsa_countries_enabled':
+        result = await apiRequest('GET', '/company/country/');
+        break;
       // === AUCTIONS ===
       case 'bolsa_auctions_active': 
         result = await apiRequest('GET', `/api/auction/active?limit=${params.limit||50}`); 
