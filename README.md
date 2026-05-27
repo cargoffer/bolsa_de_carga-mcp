@@ -126,6 +126,35 @@ bolsa_de_carga-mcp/
 
 ---
 
+---
+
+## Authentication
+
+To use this MCP server, you need an API key from the Bolsa de Carga platform.
+
+**Register:** https://cia.cargoffer.com
+
+Create an account and get your API key from your profile settings. Then configure:
+
+```bash
+export API_KEY="your-api-key"
+```
+
+Or in your MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "bolsa-de-carga": {
+      "command": "...",
+      "env": {
+        "API_KEY": "your-api-key-from-cia"
+      }
+    }
+  }
+}
+```
+
 ## Quick Start
 
 ```bash
