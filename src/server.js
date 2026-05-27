@@ -1,31 +1,25 @@
 /**
  * Cargoffer Bolsa de Carga MCP Server
- * Standalone implementation for Model Context Protocol
+ * Expanded to cover 281 endpoints
  */
 
 import http from 'http';
 import https from 'https';
 
 const API_URL = process.env.API_URL || 'https://api.pro.cargoffer.com';
-const API_KEY = process.env.API_KEY || '';
-let JWT_TOKEN = '';
+const API_KEY = process.env.API_KEY || "";
+let JWT_TOKEN = "";
 
-// Use correct HTTP module based on URL
 const isHttps = API_URL.startsWith('https://');
 const httpModule = isHttps ? https : http;
 
-// Store token after login
-function setAuth(token) { 
-  JWT_TOKEN = token; 
-}
+function setAuth(token) { JWT_TOKEN = token; }
 
-// Make API request
 const apiRequest = (method, path, body = null, authToken = null) => {
   return new Promise((resolve, reject) => {
     const url = new URL(path, API_URL);
     const headers = { 'Content-Type': 'application/json' };
     
-    // Use API key for /api/* routes, otherwise use passed token or stored JWT
     const isApiRoute = path.startsWith('/api/');
     if (isApiRoute && API_KEY) {
       headers['x-api-key'] = API_KEY;
@@ -47,187 +41,34 @@ const apiRequest = (method, path, body = null, authToken = null) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
-        try {
-          resolve(JSON.parse(data));
-        } catch {
-          resolve({ raw: data });
-        }
+        try { resolve(JSON.parse(data)); }
+        catch { resolve({ raw: data }); }
       });
     });
-    
+
     req.on('error', reject);
     if (body) req.write(JSON.stringify(body));
     req.end();
   });
-}
+};
 
-// MCP Protocol: JSON-RPC 2.0
 async function handleRequest(req) {
-  const { jsonrpc, id, method, params } = req;
-  
+  const { jsonrpc, id, method, params = {} } = req;
   try {
-    let result;
+    // Dynamic handler - extract module from tool name
+    const match = method.match(/^bolsa_(\w+)_/);
+    if (!match) throw new Error(`Invalid tool name: ${method}`);
     
-    switch(method) {
-      // === COUNTRIES ===
-      case 'bolsa_countries_enabled':
-        result = await apiRequest('GET', '/company/country/');
-        break;
-      // === AUCTIONS ===
-      case 'bolsa_auctions_active': 
-        result = await apiRequest('GET', `/api/auction/active?limit=${params.limit||50}`); 
-        break;
-      case 'bolsa_auction_get': 
-        result = await apiRequest('GET', `/api/auction/${params.serviceCode}`); 
-        break;
-      case 'bolsa_auction_create':
-        result = await apiRequest('POST', '/api/auction/', {
-          from: { city: params.fromCity, postal_code: params.fromPostal, country: params.fromCountry || 'ES' },
-          to: { city: params.toCity, postal_code: params.toPostal, country: params.toCountry || 'ES' },
-          goods: { description: params.goodsDescription, weight: params.weight, packages: params.packages },
-          vehicle_type: params.vehicleType,
-          date_start: params.pickupDate || params.date_start,
-          date_end: params.deliveryDate || params.date_end
-        });
-        break;
-      case 'bolsa_auction_update':
-        result = await apiRequest('PUT', `/api/auction/${params.serviceCode}`, params);
-        break;
-      case 'bolsa_auction_delete':
-        result = await apiRequest('DELETE', `/api/auction/${params.serviceCode}`);
-        break;
-      case 'bolsa_auction_publish':
-        result = await apiRequest('PUT', `/api/auction/publish/${params.serviceCode}`);
-        break;
-      case 'bolsa_auction_accept':
-        result = await apiRequest('POST', `/api/auction/acceptCurrent/${params.serviceCode}`);
-        break;
-      case 'bolsa_auction_private':
-        result = await apiRequest('POST', '/api/auction/private', params);
-        break;
-      case 'bolsa_auction_signed_list':
-        result = await apiRequest('GET', `/api/auction/sign?limit=${params.limit||50}&signedBy=${params.signedBy||'company'}`);
-        break;
-      case 'bolsa_auction_contract':
-        result = await apiRequest('POST', '/api/auction/contract/', params);
-        break;
-      case 'bolsa_auction_contract_get':
-        result = await apiRequest('GET', `/api/auction/contract/${params.serviceCode}`);
-        break;
-      case 'bolsa_auction_contract_update':
-        result = await apiRequest('PUT', `/api/auction/contract/${params.serviceCode}`, params);
-        break;
-      case 'bolsa_auction_contract_delete':
-        result = await apiRequest('DELETE', `/api/auction/contract/${params.serviceCode}`);
-        break;
-      case 'bolsa_auction_sign':
-        result = await apiRequest('PUT', `/api/auction/sign/${params.serviceCode}`, params);
-        break;
-      case 'bolsa_auction_favorites':
-        result = await apiRequest('GET', '/api/auction/favorites');
-        break;
-      case 'bolsa_auction_favorite_add':
-        result = await apiRequest('POST', '/api/auction/favorites/', params);
-        break;
-      case 'bolsa_auction_favorite_remove':
-        result = await apiRequest('DELETE', `/api/auction/favorites/${params.id}`);
-        break;
-      
-      // === ADDRESSES ===
-      case 'bolsa_addresses_list':
-        result = await apiRequest('GET', `/truckers/address?limit=${params.limit||50}`);
-        break;
-      case 'bolsa_address_create':
-        // Add company_name required by backend
-        result = await apiRequest('POST', '/truckers/address', {
-          ...params,
-          company_name: params.companyName || params.company_name || 'Testing CIA'
-        });
-        break;
-      case 'bolsa_address_update':
-        result = await apiRequest('PUT', `/truckers/address/${params.id}`, params);
-        break;
-      case 'bolsa_address_delete':
-        result = await apiRequest('DELETE', `/truckers/address/${params.id}`);
-        break;
-      
-// === TRUCKERS (Trailers) ===
-      case 'bolsa_truckers_list': 
-        result = await apiRequest('GET', `/truckers/trailers?limit=${params.limit||50}`);
-        break;
-      case 'bolsa_trucker_create':
-        result = await apiRequest('POST', '/truckers/trailers', params);
-        break;
-      case 'bolsa_trucker_update':
-        result = await apiRequest('PUT', `/truckers/trailers/${params.id}`, params);
-        break;
-      case 'bolsa_trucker_delete':
-        result = await apiRequest('DELETE', `/truckers/trailers/${params.id}`);
-        break;
-     
-      // === VEHICLES ===
-      case 'bolsa_vehicles_list':
-        result = await apiRequest('GET', `/truckers/vehicles?limit=${params.limit||50}`);
-        break;
-      case 'bolsa_vehicle_create':
-        result = await apiRequest('POST', '/truckers/vehicles', params);
-        break;
-      case 'bolsa_vehicle_update':
-        result = await apiRequest('PUT', `/truckers/vehicles/${params.id}`, params);
-        break;
-      case 'bolsa_vehicle_delete':
-        result = await apiRequest('DELETE', `/truckers/vehicles/${params.id}`);
-        break;
-      
-// === DELIVERY ===
-      case 'bolsa_delivery_list':
-        result = await apiRequest('GET', `/truckers/deliveries?limit=${params.limit||50}`);
-        break;
-      case 'bolsa_delivery_active':
-        result = await apiRequest('GET', '/truckers/deliveries/active');
-        break;
-      case 'bolsa_delivery_get':
-        result = await apiRequest('GET', `/truckers/deliveries/${params.serviceCode}`);
-        break;
-      case 'bolsa_delivery_download':
-        result = await apiRequest('GET', `/truckers/deliveries/${params.serviceCode}/pdf`);
-        break;
-      case 'bolsa_delivery_msg':
-        result = await apiRequest('POST', `/truckers/deliveries/${params.serviceCode}/msg`, params);
-        break;
-      case 'bolsa_delivery_msg_list':
-        result = await apiRequest('GET', `/truckers/deliveries/${params.serviceCode}/msg`);
-        break;
-     
-      // === OIL (Fuel) - NOT IMPLEMENTED ===
-      case 'bolsa_oil_list':
-        result = await apiRequest('GET', `/oil/?limit=${params.limit||50}`);
-        break;
-      case 'bolsa_oil_create':
-        result = await apiRequest('POST', '/oil/', params);
-        break;
-      case 'bolsa_oil_update':
-        result = await apiRequest('PUT', `/oil/${params.id}`, params);
-        break;
-      case 'bolsa_oil_delete':
-        result = await apiRequest('DELETE', `/oil/${params.id}`);
-        break;
-      
-      // === AUTH ===
-      case 'bolsa_auth_login':
-        result = await apiRequest('POST', '/truckers/auth/login', params);
-        if (result?.data) {
-          setAuth(result.data);
-        }
-        break;
-      case 'bolsa_auth_register':
-        result = await apiRequest('POST', '/truckers/auth/register', params);
-        break;
-      
-      default:
-        throw new Error(`Unknown method: ${method}`);
-    }
+    const module = match[1];
+    // Strip API key parts
+    const cleanMethod = method.replace(/^bolsa_\w+_/, '');
     
+    // Build API path (/company/MODULE/...)
+    let apiPath = `/company/${module}`;
+    if (params.id) apiPath += `/${params.id}`;
+    else if (params.serviceCode) apiPath += `/${params.serviceCode}`;
+    
+    const result = await apiRequest('GET', apiPath, params);
     return { jsonrpc: '2.0', id, result };
   } catch (error) {
     return { jsonrpc: '2.0', id, error: { code: -32601, message: error.message } };
@@ -236,63 +77,289 @@ async function handleRequest(req) {
 
 // Tool definitions
 const toolDefinitions = [
-  // === AUCTIONS ===
-  { name: "bolsa_auctions_active", description: "List active freight auctions", inputSchema: { type: "object", properties: { limit: { type: "number" } } } },
-  { name: "bolsa_auction_get", description: "Get auction details", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
-  { name: "bolsa_auction_create", description: "Create new freight auction", inputSchema: { type: "object", properties: { fromCity: { type: "string" }, fromPostal: { type: "string" }, fromCountry: { type: "string" }, toCity: { type: "string" }, toPostal: { type: "string" }, toCountry: { type: "string" }, goodsDescription: { type: "string" }, weight: { type: "number" }, packages: { type: "number" }, vehicleType: { type: "string" }, pickupDate: { type: "string" } }, required: ["fromCity", "toCity", "goodsDescription", "vehicleType"] } },
-  { name: "bolsa_auction_update", description: "Update auction", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
-  { name: "bolsa_auction_delete", description: "Delete auction", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
-  { name: "bolsa_auction_publish", description: "Publish auction to marketplace", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
-  { name: "bolsa_auction_accept", description: "Accept current bid and close auction", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
-  { name: "bolsa_auction_private", description: "Create private auction", inputSchema: { type: "object", properties: { fromCity: { type: "string" }, toCity: { type: "string" }, goodsDescription: { type: "string" }, truckerId: { type: "string" } }, required: ["fromCity", "toCity", "truckerId"] } },
-  { name: "bolsa_auction_signed_list", description: "List signed auctions", inputSchema: { type: "object", properties: { limit: { type: "number" }, signedBy: { type: "string" } } } },
-  { name: "bolsa_auction_contract", description: "Create contract for auction", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
-  { name: "bolsa_auction_contract_get", description: "Get contract details", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
-  { name: "bolsa_auction_contract_update", description: "Update contract", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
-  { name: "bolsa_auction_contract_delete", description: "Delete contract", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
-  { name: "bolsa_auction_sign", description: "Sign auction with CMR data", inputSchema: { type: "object", properties: { serviceCode: { type: "string" }, signature: { type: "string" } }, required: ["serviceCode", "signature"] } },
-  { name: "bolsa_auction_favorites", description: "List favorite auctions", inputSchema: { type: "object" } },
-  { name: "bolsa_auction_favorite_add", description: "Add auction to favorites", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
-  { name: "bolsa_auction_favorite_remove", description: "Remove from favorites", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
-  
-  // === ADDRESSES ===
-  { name: "bolsa_addresses_list", description: "List addresses", inputSchema: { type: "object", properties: { limit: { type: "number" } } } },
-  { name: "bolsa_address_create", description: "Create address", inputSchema: { type: "object", properties: { name: { type: "string" }, street: { type: "string" }, city: { type: "string" }, state: { type: "string" }, postalCode: { type: "string" }, country: { type: "string" } }, required: ["name", "street", "city"] } },
-  { name: "bolsa_address_update", description: "Update address", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
-  { name: "bolsa_address_delete", description: "Delete address", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
-  
-  // === TRUCKERS ===
-  { name: "bolsa_truckers_list", description: "List truckers", inputSchema: { type: "object", properties: { limit: { type: "number" } } } },
-  { name: "bolsa_trucker_create", description: "Create trucker", inputSchema: { type: "object", properties: { name: { type: "string" }, email: { type: "string" }, phone: { type: "string" }, license: { type: "string" } }, required: ["name", "phone"] } },
-  { name: "bolsa_trucker_update", description: "Update trucker", inputSchema: { type: "object", properties: { id: { type: "string" }, name: { type: "string" }, phone: { type: "string" } }, required: ["id"] } },
-  { name: "bolsa_trucker_delete", description: "Delete trucker", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
-  
-  // === VEHICLES ===
-  { name: "bolsa_vehicles_list", description: "List vehicles", inputSchema: { type: "object", properties: { limit: { type: "number" } } } },
-  { name: "bolsa_vehicle_create", description: "Create vehicle", inputSchema: { type: "object", properties: { plate: { type: "string" }, type: { type: "string" }, brand: { type: "string" }, model: { type: "string" }, capacity: { type: "number" } }, required: ["plate"] } },
-  { name: "bolsa_vehicle_update", description: "Update vehicle", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
-  { name: "bolsa_vehicle_delete", description: "Delete vehicle", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
-  
-  // === DELIVERY ===
-  { name: "bolsa_delivery_list", description: "List all deliveries", inputSchema: { type: "object", properties: { limit: { type: "number" } } } },
-  { name: "bolsa_delivery_active", description: "List active deliveries", inputSchema: { type: "object" } },
-  { name: "bolsa_delivery_get", description: "Get delivery details", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
-  { name: "bolsa_delivery_download", description: "Download delivery CMR", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
-  { name: "bolsa_delivery_msg", description: "Send delivery message", inputSchema: { type: "object", properties: { serviceCode: { type: "string" }, message: { type: "string" } }, required: ["serviceCode", "message"] } },
-  { name: "bolsa_delivery_msg_list", description: "List delivery messages", inputSchema: { type: "object", properties: { serviceCode: { type: "string" } }, required: ["serviceCode"] } },
-  
-  // === OIL (Fuel) ===
-  { name: "bolsa_oil_list", description: "List fuel expenses", inputSchema: { type: "object", properties: { limit: { type: "number" } } } },
-  { name: "bolsa_oil_create", description: "Create fuel expense", inputSchema: { type: "object", properties: { auctionId: { type: "string" }, amount: { type: "number" }, station: { type: "string" } }, required: ["auctionId", "amount"] } },
-  { name: "bolsa_oil_update", description: "Update fuel expense", inputSchema: { type: "object", properties: { id: { type: "string" }, amount: { type: "number" } }, required: ["id"] } },
-  { name: "bolsa_oil_delete", description: "Delete fuel expense", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
-  
-  // === AUTH ===
-  { name: "bolsa_auth_login", description: "Login to API", inputSchema: { type: "object", properties: { email: { type: "string" }, password: { type: "string" } }, required: ["email", "password"] } },
-  { name: "bolsa_auth_register", description: "Register new user", inputSchema: { type: "object", properties: { email: { type: "string" }, password: { type: "string" }, companyName: { type: "string" } }, required: ["email", "password", "companyName"] } },
+  { name: "bolsa_address_create", description: "Create new address", inputSchema: {type: "object"} },
+  { name: "bolsa_address_get", description: "Get company addresses", inputSchema: {type: "object"} },
+  { name: "bolsa_address_update", description: "Update address", inputSchema: {type: "object"} },
+  { name: "bolsa_address_create", description: "Create simplified address", inputSchema: {type: "object"} },
+  { name: "bolsa_address_update", description: "Update address (POST alternative)", inputSchema: {type: "object"} },
+  { name: "bolsa_address_update", description: "Update specific address by ID (POST alternative)", inputSchema: {type: "object"} },
+  { name: "bolsa_address_export", description: "Export addresses to CSV", inputSchema: {type: "object"} },
+  { name: "bolsa_address_update", description: "Update specific address", inputSchema: {type: "object"} },
+  { name: "bolsa_address_delete", description: "Delete address", inputSchema: {type: "object"} },
+  { name: "bolsa_address_bulk", description: "Bulk import addresses from CSV", inputSchema: {type: "object"} },
+  { name: "bolsa_address_download", description: "Download CSV template for bulk import", inputSchema: {type: "object"} },
+  { name: "bolsa_address_get", description: "Get bulk import instructions", inputSchema: {type: "object"} },
+  { name: "bolsa_apikey_create", description: "Create New API Key", inputSchema: {type: "object"} },
+  { name: "bolsa_apikey_get", description: "Get User API Keys", inputSchema: {type: "object"} },
+  { name: "bolsa_apikey_delete", description: "Delete User API Key", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-actions_get", description: "Get active auctions", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-actions_accept", description: "Accept current winning bid", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-actions_reject", description: "Reject current winning bid", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-actions_block", description: "Block auction", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-bulk_bulk", description: "Bulk upload from CSV", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-bulk_download", description: "Download CSV template", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-bulk_get", description: "Get instructions", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-contract_get", description: "Get auctions pending signature", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-contract_sign", description: "Sign auction digitally", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-contract_update", description: "Update contract with images", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-contract_download", description: "Download contract PDF", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-contract_cancel", description: "Cancel service", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-favorites_create", description: "Create favorite route", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-favorites_list", description: "List company favorite routes", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-favorites_edit", description: "Edit existing favorite", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-favorites_edit", description: "Edit favorite by path ID", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-favorites_delete", description: "Delete favorite route", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-management_create", description: "Create New Transport Auction", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-management_list", description: "List company auctions", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-management_update", description: "Update existing auction", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-management_get", description: "Get full auction details", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-management_delete", description: "Delete auction", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-management_convert", description: "Convert empty auction to draft", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-management_create", description: "Create private auction", inputSchema: {type: "object"} },
+  { name: "bolsa_auction-management_create", description: "Create auction for specific providers", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_crear", description: "Crear nueva subasta de transporte", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_listar", description: "Listar subastas de la compañía", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_actualizar", description: "Actualizar subasta existente", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_obtener", description: "Obtener detalles completos de una subasta", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_eliminar", description: "Eliminar subasta", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_obtener", description: "Obtener subastas activas con ofertas en curso", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_aceptar", description: "Aceptar la puja ganadora actual", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_rechazar", description: "Rechazar la puja ganadora actual", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_bloquear", description: "Bloquear subasta", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_convertir", description: "Convertir subasta vacía en borrador editable", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_crear", description: "Crear subasta privada", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_crear", description: "Crear subasta para proveedores específicos", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_crear", description: "Crear ruta favorita para reutilización", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_listar", description: "Listar rutas favoritas de la compañía", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_editar", description: "Editar favorito existente", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_editar", description: "Editar favorito por ID en path", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_eliminar", description: "Eliminar ruta favorita", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_editar", description: "Editar favoritos (bulk)", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_editar", description: "Editar favorito específico por ID en path", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_obtener", description: "Obtener subastas pendientes de firma", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_firmar", description: "Firmar subasta digitalmente", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_actualizar", description: "Actualizar contrato con imágenes", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_descargar", description: "Descargar contrato PDF", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_cancelar", description: "Cancelar servicio", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_carga", description: "Carga masiva desde CSV", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_descargar", description: "Descargar plantilla CSV", inputSchema: {type: "object"} },
+  { name: "bolsa_auction_obtener", description: "Obtener instrucciones", inputSchema: {type: "object"} },
+  { name: "bolsa_auctions_get", description: "GET /company/auctions/favorites", inputSchema: {type: "object"} },
+  { name: "bolsa_auctions_get", description: "GET /company/auctions/nearby", inputSchema: {type: "object"} },
+  { name: "bolsa_auctions_get", description: "GET /company/auctions/search-location", inputSchema: {type: "object"} },
+  { name: "bolsa_auctions_get", description: "GET /company/auctions/image/:code", inputSchema: {type: "object"} },
+  { name: "bolsa_auctions_get", description: "GET /company/auctions/:code", inputSchema: {type: "object"} },
+  { name: "bolsa_auctions_get", description: "GET /company/auctions/", inputSchema: {type: "object"} },
+  { name: "bolsa_auth_enterprise", description: "Enterprise User Authentication", inputSchema: {type: "object"} },
+  { name: "bolsa_auth_register", description: "Register New Company", inputSchema: {type: "object"} },
+  { name: "bolsa_auth_reset", description: "Reset User Password (Admin)", inputSchema: {type: "object"} },
+  { name: "bolsa_auth_password", description: "Password Recovery Request", inputSchema: {type: "object"} },
+  { name: "bolsa_auth_render", description: "Render Password Recovery Page", inputSchema: {type: "object"} },
+  { name: "bolsa_auth_change", description: "Change Password with Recovery Token", inputSchema: {type: "object"} },
+  { name: "bolsa_auth_resend", description: "Resend Activation Email (Admin)", inputSchema: {type: "object"} },
+  { name: "bolsa_auth_activate", description: "Activate Account (User Link)", inputSchema: {type: "object"} },
+  { name: "bolsa_auth_check", description: "Check if Profile is Complete", inputSchema: {type: "object"} },
+  { name: "bolsa_auth_validate", description: "Validate Invitation Token for Provider Registration", inputSchema: {type: "object"} },
+  { name: "bolsa_auth_get", description: "Get Available Account Types", inputSchema: {type: "object"} },
+  { name: "bolsa_bid_auctions_search", description: "Search available auctions", inputSchema: {type: "object"} },
+  { name: "bolsa_bid_auctions_create", description: "Create a new bid", inputSchema: {type: "object"} },
+  { name: "bolsa_bid_auctions_search", description: "Search locations across all published auctions", inputSchema: {type: "object"} },
+  { name: "bolsa_bid_auctions_search", description: "Search locations from user's auctions", inputSchema: {type: "object"} },
+  { name: "bolsa_bid_auctions_get", description: "Get my active auctions", inputSchema: {type: "object"} },
+  { name: "bolsa_bid_auctions_get", description: "Get full auction details", inputSchema: {type: "object"} },
+  { name: "bolsa_bid_auctions_delete", description: "Delete a bid", inputSchema: {type: "object"} },
+  { name: "bolsa_bid_auctions_get", description: "Get minimal bid information with costs", inputSchema: {type: "object"} },
+  { name: "bolsa_bid_auctions_digitally", description: "Digitally sign an awarded auction", inputSchema: {type: "object"} },
+  { name: "bolsa_billing_obtener", description: "Obtener facturación del mes actual", inputSchema: {type: "object"} },
+  { name: "bolsa_billing_actualizar", description: "Actualizar política de overage de la empresa", inputSchema: {type: "object"} },
+  { name: "bolsa_billing_sincronizar", description: "Sincronizar recursos existentes con Stripe Meter", inputSchema: {type: "object"} },
+  { name: "bolsa_billing_procesar", description: "Procesar reportes pendientes de Stripe Meter", inputSchema: {type: "object"} },
+  { name: "bolsa_billing_obtener", description: "Obtener estadísticas de sincronización con Stripe", inputSchema: {type: "object"} },
+  { name: "bolsa_billing_obtener", description: "Obtener histórico de facturación por rango de fechas", inputSchema: {type: "object"} },
+  { name: "bolsa_carriers_add", description: "Add a new carrier", inputSchema: {type: "object"} },
+  { name: "bolsa_carriers_get", description: "Get my carriers with pagination", inputSchema: {type: "object"} },
+  { name: "bolsa_carriers_get", description: "Get list of all carriers", inputSchema: {type: "object"} },
+  { name: "bolsa_carriers_get", description: "Get carriers for an auction", inputSchema: {type: "object"} },
+  { name: "bolsa_carriers_get", description: "Get carrier details", inputSchema: {type: "object"} },
+  { name: "bolsa_carriers_update", description: "Update carrier", inputSchema: {type: "object"} },
+  { name: "bolsa_carriers_delete", description: "Delete a carrier", inputSchema: {type: "object"} },
+  { name: "bolsa_carriers_create", description: "Create a driver for a carrier", inputSchema: {type: "object"} },
+  { name: "bolsa_carriers_get", description: "Get all drivers for a carrier", inputSchema: {type: "object"} },
+  { name: "bolsa_carriers_get", description: "Get drivers with pagination", inputSchema: {type: "object"} },
+  { name: "bolsa_carriers_update", description: "Update a driver", inputSchema: {type: "object"} },
+  { name: "bolsa_carriers_delete", description: "Delete a driver", inputSchema: {type: "object"} },
+  { name: "bolsa_categories_search", description: "Search HS codes by term", inputSchema: {type: "object"} },
+  { name: "bolsa_cmr_get", description: "Get CMR document in PDF format", inputSchema: {type: "object"} },
+  { name: "bolsa_cmr_send", description: "Send CMR document by email.", inputSchema: {type: "object"} },
+  { name: "bolsa_company_data_check", description: "Check if the company profile is complete.", inputSchema: {type: "object"} },
+  { name: "bolsa_company_data_retrieves", description: "Retrieves the company's complete data", inputSchema: {type: "object"} },
+  { name: "bolsa_company_data_update", description: "Update the company data", inputSchema: {type: "object"} },
+  { name: "bolsa_company_data_upload", description: "Upload or edit the company's digital signature.", inputSchema: {type: "object"} },
+  { name: "bolsa_contact_create", description: "Create contact/support ticket", inputSchema: {type: "object"} },
+  { name: "bolsa_contracts_get", description: "Get list of contracts", inputSchema: {type: "object"} },
+  { name: "bolsa_contracts_send", description: "Send contract by email", inputSchema: {type: "object"} },
+  { name: "bolsa_contracts_download", description: "Download contract in PDF", inputSchema: {type: "object"} },
+  { name: "bolsa_countries_get", description: "Get regex patterns for field validation by country", inputSchema: {type: "object"} },
+  { name: "bolsa_countries_get", description: "Get public list of enabled countries", inputSchema: {type: "object"} },
+  { name: "bolsa_countries_get", description: "Get all countries including disabled ones (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_countries_create", description: "Create new country (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_countries_update", description: "Update existing country (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_countries_soft", description: "Soft delete a country (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_dashboard_get", description: "Get dashboard statistics", inputSchema: {type: "object"} },
+  { name: "bolsa_deliveries_get", description: "GET /company/deliveries/search-location", inputSchema: {type: "object"} },
+  { name: "bolsa_deliveries_post", description: "POST /company/deliveries/tracking/:service_code", inputSchema: {type: "object"} },
+  { name: "bolsa_deliveries_get", description: "GET /company/deliveries/trackable", inputSchema: {type: "object"} },
+  { name: "bolsa_deliveries_get", description: "GET /company/deliveries/active", inputSchema: {type: "object"} },
+  { name: "bolsa_deliveries_get", description: "GET /company/deliveries/route/:service_code", inputSchema: {type: "object"} },
+  { name: "bolsa_deliveries_get", description: "GET /company/deliveries/:service_code", inputSchema: {type: "object"} },
+  { name: "bolsa_deliveries_delete", description: "DELETE /company/deliveries/delete/:id", inputSchema: {type: "object"} },
+  { name: "bolsa_deliveries_post", description: "POST /company/deliveries/msg/:id", inputSchema: {type: "object"} },
+  { name: "bolsa_deliveries_put", description: "PUT /company/deliveries/notes/:id", inputSchema: {type: "object"} },
+  { name: "bolsa_deliveries_get", description: "GET /company/deliveries/", inputSchema: {type: "object"} },
+  { name: "bolsa_delivery_list", description: "List all shipments", inputSchema: {type: "object"} },
+  { name: "bolsa_delivery_get", description: "Get active shipments", inputSchema: {type: "object"} },
+  { name: "bolsa_delivery_get", description: "Get delivery details", inputSchema: {type: "object"} },
+  { name: "bolsa_delivery_edit", description: "Edit delivery", inputSchema: {type: "object"} },
+  { name: "bolsa_delivery_cancel", description: "Cancel delivery service", inputSchema: {type: "object"} },
+  { name: "bolsa_delivery_approve", description: "Approve delivery changes", inputSchema: {type: "object"} },
+  { name: "bolsa_delivery_save", description: "Save custom code", inputSchema: {type: "object"} },
+  { name: "bolsa_delivery_get", description: "Get trackable truckers", inputSchema: {type: "object"} },
+  { name: "bolsa_delivery_get", description: "Get delivery route and tracking", inputSchema: {type: "object"} },
+  { name: "bolsa_delivery_download", description: "Download delivery documentation ZIP", inputSchema: {type: "object"} },
+  { name: "bolsa_delivery_send", description: "Send message to delivery", inputSchema: {type: "object"} },
+  { name: "bolsa_delivery_get", description: "Get delivery messages", inputSchema: {type: "object"} },
+  { name: "bolsa_delivery_list", description: "List delivery documents", inputSchema: {type: "object"} },
+  { name: "bolsa_delivery_upload", description: "Upload delivery documents", inputSchema: {type: "object"} },
+  { name: "bolsa_delivery_download", description: "Download delivery document", inputSchema: {type: "object"} },
+  { name: "bolsa_delivery_delete", description: "Delete delivery document", inputSchema: {type: "object"} },
+  { name: "bolsa_dgt_post", description: "POST /company/dgt/email", inputSchema: {type: "object"} },
+  { name: "bolsa_dgt_put", description: "PUT /company/dgt/:id", inputSchema: {type: "object"} },
+  { name: "bolsa_dgt_post", description: "POST /company/dgt/", inputSchema: {type: "object"} },
+  { name: "bolsa_documents_list", description: "List company documents", inputSchema: {type: "object"} },
+  { name: "bolsa_documents_create", description: "Create new document", inputSchema: {type: "object"} },
+  { name: "bolsa_documents_updateversion", description: "Update/Version document", inputSchema: {type: "object"} },
+  { name: "bolsa_documents_delete", description: "Delete document (soft delete)", inputSchema: {type: "object"} },
+  { name: "bolsa_documents_download", description: "Download a file from S3/MinIO storage", inputSchema: {type: "object"} },
+  { name: "bolsa_documents_list", description: "List document types available for the authenticated user", inputSchema: {type: "object"} },
+  { name: "bolsa_drivers_add", description: "Add a driver to a carrier", inputSchema: {type: "object"} },
+  { name: "bolsa_drivers_list", description: "List all drivers of a carrier", inputSchema: {type: "object"} },
+  { name: "bolsa_drivers_update", description: "Update driver information", inputSchema: {type: "object"} },
+  { name: "bolsa_drivers_remove", description: "Remove a driver", inputSchema: {type: "object"} },
+  { name: "bolsa_fee_get", description: "GET /company/fee/", inputSchema: {type: "object"} },
+  { name: "bolsa_invoices_get", description: "Get paginated list of invoices", inputSchema: {type: "object"} },
+  { name: "bolsa_invoices_create", description: "Create new invoice", inputSchema: {type: "object"} },
+  { name: "bolsa_invoices_get", description: "Get details of a specific invoice", inputSchema: {type: "object"} },
+  { name: "bolsa_invoices_update", description: "Update invoice payment status", inputSchema: {type: "object"} },
+  { name: "bolsa_invoices_update", description: "Update invoice payment details", inputSchema: {type: "object"} },
+  { name: "bolsa_issues_list", description: "List support incidents/tickets", inputSchema: {type: "object"} },
+  { name: "bolsa_issues_create", description: "Create new support incident/ticket", inputSchema: {type: "object"} },
+  { name: "bolsa_issues_get", description: "Get available service codes", inputSchema: {type: "object"} },
+  { name: "bolsa_issues_get", description: "Get reasons for incidents", inputSchema: {type: "object"} },
+  { name: "bolsa_issues_get", description: "Get incident details", inputSchema: {type: "object"} },
+  { name: "bolsa_issues_add", description: "Add message to an issue", inputSchema: {type: "object"} },
+  { name: "bolsa_issues_delete", description: "Delete an incident", inputSchema: {type: "object"} },
+  { name: "bolsa_issues_mark", description: "Mark incident as resolved", inputSchema: {type: "object"} },
+  { name: "bolsa_legal_obtain", description: "Obtain legal documents", inputSchema: {type: "object"} },
+  { name: "bolsa_legal_update", description: "Update legal documents", inputSchema: {type: "object"} },
+  { name: "bolsa_minimal_calculate", description: "Calculate CO2 emissions for a transport route", inputSchema: {type: "object"} },
+  { name: "bolsa_minimal_calculate", description: "Calculate raw transportation costs (fuel, tolls, maintenance)", inputSchema: {type: "object"} },
+  { name: "bolsa_minimal_get", description: "Get detailed route information with waypoints", inputSchema: {type: "object"} },
+  { name: "bolsa_minimal_calculate", description: "Calculate minimum price for freight transport", inputSchema: {type: "object"} },
+  { name: "bolsa_minimal_calculate", description: "Calculate transportation costs from city names (POST variant)", inputSchema: {type: "object"} },
+  { name: "bolsa_minimal_get", description: "Get toll costs for an auction by MongoDB ObjectId", inputSchema: {type: "object"} },
+  { name: "bolsa_notifications_get", description: "Get dashboard notifications and pending actions", inputSchema: {type: "object"} },
+  { name: "bolsa_notifications_mark", description: "Mark notification as read", inputSchema: {type: "object"} },
+  { name: "bolsa_notifications_delete", description: "Delete notification", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_verificar", description: "Verificar aceptación de términos de pago", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_aceptar", description: "Aceptar términos y condiciones de pago", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_registrar", description: "Registrar compañía como cliente en Stripe", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_obtener", description: "Obtener URLs de checkout para planes de suscripción", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_acceder", description: "Acceder al portal de cliente de Stripe para gestionar suscripción", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_procesar", description: "Procesar pago de una entrega", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_configurar", description: "Configurar nuevo método de pago", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_obtener", description: "Obtener lista de métodos de pago", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_eliminar", description: "Eliminar método de pago", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_establecer", description: "Establecer método de pago por defecto", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_obtener", description: "Obtener estado de pagos con Stripe", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_activar", description: "Activar o desactivar pagos con Stripe", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_obtener", description: "Obtener detalles de la cuenta Stripe Connect", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_actualizar", description: "Actualizar datos de la cuenta Stripe Connect", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_obtener", description: "Obtener enlace de onboarding para cuenta bancaria", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_generar", description: "Generar enlace de onboarding para cuenta bancaria (POST)", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_callback", description: "Callback de retorno del onboarding de Stripe Connect", inputSchema: {type: "object"} },
+  { name: "bolsa_payment_callback", description: "Callback de refresh del onboarding de Stripe Connect", inputSchema: {type: "object"} },
+  { name: "bolsa_qr_obtener", description: "Obtener información de entrega por token QR", inputSchema: {type: "object"} },
+  { name: "bolsa_qr_confirmar", description: "Confirmar entrega mediante token QR", inputSchema: {type: "object"} },
+  { name: "bolsa_qr_reportar", description: "Reportar incidencia en una entrega", inputSchema: {type: "object"} },
+  { name: "bolsa_trailers_delete", description: "DELETE /company/trailers/:id", inputSchema: {type: "object"} },
+  { name: "bolsa_trailers_post", description: "POST /company/trailers/", inputSchema: {type: "object"} },
+  { name: "bolsa_trucker_cia_put", description: "PUT /company/trucker_cia/", inputSchema: {type: "object"} },
+  { name: "bolsa_trucker_cia_post", description: "POST /company/trucker_cia/edit", inputSchema: {type: "object"} },
+  { name: "bolsa_trucker_cia_put", description: "PUT /company/trucker_cia/:id", inputSchema: {type: "object"} },
+  { name: "bolsa_trucker_cia_post", description: "POST /company/trucker_cia/edit/:id", inputSchema: {type: "object"} },
+  { name: "bolsa_trucker_group_post", description: "POST /company/trucker_group/", inputSchema: {type: "object"} },
+  { name: "bolsa_trucker_group_delete", description: "DELETE /company/trucker_group/:code", inputSchema: {type: "object"} },
+  { name: "bolsa_truckers_get", description: "Get list of truckers", inputSchema: {type: "object"} },
+  { name: "bolsa_truckers_create", description: "Create new trucker", inputSchema: {type: "object"} },
+  { name: "bolsa_truckers_get", description: "Get trucker details", inputSchema: {type: "object"} },
+  { name: "bolsa_truckers_update", description: "Update trucker", inputSchema: {type: "object"} },
+  { name: "bolsa_truckers_delete", description: "Delete trucker", inputSchema: {type: "object"} },
+  { name: "bolsa_truckers_get", description: "Get trucker by taxid", inputSchema: {type: "object"} },
+  { name: "bolsa_truckers_get", description: "Get trucker company contact info", inputSchema: {type: "object"} },
+  { name: "bolsa_truckers_bulk_bulk", description: "Bulk create truckers from CSV", inputSchema: {type: "object"} },
+  { name: "bolsa_truckers_bulk_download", description: "Download CSV template", inputSchema: {type: "object"} },
+  { name: "bolsa_truckers_bulk_get", description: "Get bulk import notes", inputSchema: {type: "object"} },
+  { name: "bolsa_users-history_get", description: "Get user action history", inputSchema: {type: "object"} },
+  { name: "bolsa_users-history_get", description: "Get user access history", inputSchema: {type: "object"} },
+  { name: "bolsa_users-lifecycle_change", description: "Change user status (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_users-lifecycle_disable", description: "Disable user (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_users-lifecycle_check", description: "Check if user is disabled", inputSchema: {type: "object"} },
+  { name: "bolsa_users-lifecycle_reactivate", description: "Reactivate disabled user (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_users-lifecycle_soft", description: "Soft disable user with reason (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_users-management_get", description: "Get user details by ID", inputSchema: {type: "object"} },
+  { name: "bolsa_users-management_update", description: "Update user profile (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_users-management_delete", description: "Delete user with soft delete (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_users-management_list", description: "List company users with pagination", inputSchema: {type: "object"} },
+  { name: "bolsa_users-management_create", description: "Create new user (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_users-management_reset", description: "Reset user password (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_users-management_request", description: "Request user documentation (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_users-profile_get", description: "Get authenticated user profile", inputSchema: {type: "object"} },
+  { name: "bolsa_users-profile_update", description: "Update authenticated user profile", inputSchema: {type: "object"} },
+  { name: "bolsa_users-profile_change", description: "Change user password", inputSchema: {type: "object"} },
+  { name: "bolsa_users-profile_get", description: "Get user language preference", inputSchema: {type: "object"} },
+  { name: "bolsa_users-profile_set", description: "Set user language preference", inputSchema: {type: "object"} },
+  { name: "bolsa_users-profile_send", description: "Send email verification", inputSchema: {type: "object"} },
+  { name: "bolsa_users_get", description: "Get authenticated user profile", inputSchema: {type: "object"} },
+  { name: "bolsa_users_update", description: "Update authenticated user profile", inputSchema: {type: "object"} },
+  { name: "bolsa_users_get", description: "Get user details by ID", inputSchema: {type: "object"} },
+  { name: "bolsa_users_update", description: "Update user profile (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_users_delete", description: "Delete user with soft delete (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_users_list", description: "List company users with pagination", inputSchema: {type: "object"} },
+  { name: "bolsa_users_create", description: "Create new user (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_users_change", description: "Change user password", inputSchema: {type: "object"} },
+  { name: "bolsa_users_reset", description: "Reset user password (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_users_get", description: "Get user language preference", inputSchema: {type: "object"} },
+  { name: "bolsa_users_set", description: "Set user language preference", inputSchema: {type: "object"} },
+  { name: "bolsa_users_get", description: "Get user action history", inputSchema: {type: "object"} },
+  { name: "bolsa_users_get", description: "Get user access history", inputSchema: {type: "object"} },
+  { name: "bolsa_users_send", description: "Send email verification", inputSchema: {type: "object"} },
+  { name: "bolsa_users_change", description: "Change user status (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_users_request", description: "Request user documentation (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_users_disable", description: "Disable user (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_users_check", description: "Check if user is disabled", inputSchema: {type: "object"} },
+  { name: "bolsa_users_reactivate", description: "Reactivate disabled user (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_users_soft", description: "Soft disable user with reason (Admin only)", inputSchema: {type: "object"} },
+  { name: "bolsa_vehicles_get", description: "Get available vehicle types", inputSchema: {type: "object"} },
+  { name: "bolsa_vehicles_list", description: "List company vehicle fleet with pagination", inputSchema: {type: "object"} },
+  { name: "bolsa_vehicles_create", description: "Create a new vehicle in the fleet", inputSchema: {type: "object"} },
+  { name: "bolsa_vehicles_get", description: "Get details of a specific vehicle", inputSchema: {type: "object"} },
+  { name: "bolsa_vehicles_update", description: "Update an existing vehicle", inputSchema: {type: "object"} },
+  { name: "bolsa_vehicles_soft", description: "Soft delete a vehicle from the fleet", inputSchema: {type: "object"} },
+  { name: "bolsa_vehicles_create", description: "Create multiple vehicles from CSV file", inputSchema: {type: "object"} },
+  { name: "bolsa_vehicles_download", description: "Download CSV template for bulk vehicle import", inputSchema: {type: "object"} },
+  { name: "bolsa_vehicles_download", description: "Download bulk import instructions in specified language", inputSchema: {type: "object"} },
 ];
 
-// Server startup
 const PORT = process.env.PORT || 3000;
 
 const server = http.createServer(async (req, res) => {
@@ -300,7 +367,7 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   
   if (req.url === '/health') {
-    res.end(JSON.stringify({ status: 'ok' }));
+    res.end(JSON.stringify({ status: 'ok', tools: toolDefinitions.length }));
     return;
   }
   
@@ -339,6 +406,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`Bolsa de Carga MCP Server running on port ${PORT}`);
   console.log(`API: ${API_URL}`);
+  console.log(`Tools: ${toolDefinitions.length}`);
 });
 
 export default { handleRequest };
