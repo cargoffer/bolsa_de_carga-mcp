@@ -56,7 +56,7 @@ This MCP server exposes the Cargoffer Bolsa de Carga API — a unified **Europea
 
 List active auctions, get/create/update/delete auctions, publish auction, accept bid, sign with CMR, manage favorites.
 
-| Tool | Description |
+|| Tool | Description |
 |------|-------------|
 | `bolsa_auctions_active` | List active freight auctions |
 | `bolsa_auctions_get` | Get auction details by ID |
@@ -67,6 +67,14 @@ List active auctions, get/create/update/delete auctions, publish auction, accept
 | `bolsa_auctions_accept_bid` | Accept a bid on an auction |
 | `bolsa_auctions_sign_cmr` | Sign CMR waybill for auction |
 | `bolsa_auctions_favorites` | Manage favorite auctions |
+
+### Countries (1 tool)
+
+Validate which countries are enabled for marketplace operations before searching.
+
+|| Tool | Description |
+|------|-------------|
+| `bolsa_countries_enabled` | List enabled countries for search |
 
 ### Addresses (4 tools)
 
