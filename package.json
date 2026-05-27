@@ -1,6 +1,6 @@
 {
   "name": "bolsa-de-carga-mcp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "MCP Server for Cargoffer Bolsa de Carga API - Model Context Protocol",
   "main": "src/server.js",
   "type": "module",
