@@ -69,6 +69,14 @@ async function handleRequest(req) {
     else if (params.serviceCode) apiPath += `/${params.serviceCode}`;
     
     const result = await apiRequest('GET', apiPath, params);
+    
+    // Enhance auth error messages with guidance
+    // Check result.message exists AND contains NO_TOKEN
+    const msg = result.message || '';
+    if (result.status === 401 || result.status === 403 || msg.includes('NO_TOKEN')) {
+      result.message = msg + ' - Para obtener tu API key: llama bolsa_apikey_get o crea una con bolsa_apikey_create';
+    }
+    
     return { jsonrpc: '2.0', id, result };
   } catch (error) {
     return { jsonrpc: '2.0', id, error: { code: -32601, message: error.message } };
