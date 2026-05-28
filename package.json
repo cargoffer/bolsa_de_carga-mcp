@@ -1,6 +1,6 @@
 {
   "name": "bolsa-de-carga-mcp",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "MCP Server for Cargoffer Bolsa de Carga API - Model Context Protocol",
   "main": "src/server.js",
   "type": "module",
@@ -20,7 +20,13 @@
     "ai agents",
     "llm tools",
     "freight auction",
-    "load board"
+    "load board",
+    "shipping",
+    "cargo matching",
+    "truck finder",
+    "freight exchange",
+    "logistics automation",
+    "truck dispatch"
   ],
   "author": "Cargoffer",
   "license": "MIT",
